@@ -8,12 +8,8 @@ import matplotlib.pyplot as plt
 
 # Yatırım fonu sembolü
 fund_symbol = "AAPL"
-
-# Veri indirme
-data = yf.download(fund_symbol, start="2020-01-01", end="2024-06-26")
+data = yf.download(fund_symbol, start="2020-01-01", end="2024-06-25")
 data = data.dropna()
-
-# Kapanış fiyatını seçme
 data = data[['Close']]
 
 # Veriyi ölçeklendirme
@@ -22,8 +18,6 @@ scaled_data = scaler.fit_transform(data)
 
 # Eğitim ve test verisi oluşturma
 training_data_len = int(np.ceil(len(scaled_data) * 0.8))
-
-# Eğitim verisi
 train_data = scaled_data[0:int(training_data_len), :]
 
 # X_train ve y_train veri setlerini oluşturma
@@ -80,14 +74,14 @@ train = data[:training_data_len]
 valid = data[training_data_len:]
 valid['Predictions'] = predictions
 
-plt.figure(figsize=(16,8))
-plt.title('Model')
-plt.xlabel('Tarih')
-plt.ylabel('Kapanış Fiyatı USD')
-plt.plot(train['Close'])
-plt.plot(valid[['Close', 'Predictions']])
-plt.legend(['Eğitim', 'Gerçek', 'Tahminler'], loc='lower right')
-plt.show()
+# plt.figure(figsize=(16,8))
+# plt.title('Model')
+# plt.xlabel('Tarih')
+# plt.ylabel('Kapanış Fiyatı USD')
+# plt.plot(train['Close'])
+# plt.plot(valid[['Close', 'Predictions']])
+# plt.legend(['Eğitim', 'Gerçek', 'Tahminler'], loc='lower right')
+# plt.show()
 
 # Generate future dates for prediction (next 30 days)
 future_dates = pd.date_range(start=data.index[-1] + pd.Timedelta(days=1), periods=30, freq='D')
@@ -113,17 +107,32 @@ future_predictions = scaler.inverse_transform(future_predictions)
 # Slice future predictions to match future_dates length
 future_predictions = future_predictions[:30]
 
+future_predictions_updated = []
+
+
+data_once = yf.download(fund_symbol, start="2024-06-25", end="2024-06-26")
+value = data_once.iloc[0, 0]  # Assuming it's the first row and first column
+
+first = future_predictions[0]
+print(value)
+print(first[0])
+result = abs(value-first[0])
+for item in future_predictions:
+    future_predictions_updated.append(item+result) 
+
 # Flatten future_predictions if needed
-future_predictions = future_predictions.flatten()
+# future_predictions = future_predictions.flatten()
 
 # Visualize predictions including future dates
-plt.figure(figsize=(16,8))
+plt.figure(figsize=(24,8))
 plt.title('Model')
 plt.xlabel('Date')
 plt.ylabel('Closing Price (USD)')
-plt.plot(train['Close'])
+# plt.plot(train['Close'])
 plt.plot(valid[['Close', 'Predictions']])
-plt.plot(future_dates, future_predictions, linestyle='-', color='b')
+plt.plot(future_dates, future_predictions_updated, linestyle='dashed', color='b')
 plt.legend(['Training', 'Actual', 'Predictions', 'Future Predictions'], loc='lower right')
 plt.show()
+
+
 
