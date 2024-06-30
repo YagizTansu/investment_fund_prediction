@@ -2,13 +2,13 @@ import pandas as pd
 import yfinance as yf
 import numpy as np
 from sklearn.preprocessing import MinMaxScaler
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Dense, LSTM
+from tensorflow.keras.models import Sequential # type: ignore
+from tensorflow.keras.layers import Dense, LSTM # type: ignore
 import matplotlib.pyplot as plt
 
 # Yatırım fonu sembolü
-fund_symbol = "AAPL"
-data = yf.download(fund_symbol, start="2020-01-01", end="2024-06-25")
+fund_symbol = "TSLA"
+data = yf.download(fund_symbol, start="2015-01-01", end="2024-06-25")
 data = data.dropna()
 data = data[['Close']]
 
@@ -45,7 +45,7 @@ model.add(Dense(units=1))
 model.compile(optimizer='adam', loss='mean_squared_error')
 
 # Modeli eğitme
-model.fit(X_train, y_train, batch_size=1, epochs=1)
+model.fit(X_train, y_train, batch_size=1, epochs=10)  # Eğitim dönemini 10'a çıkardık
 
 # Test verisi oluşturma
 test_data = scaled_data[training_data_len - 60:, :]
@@ -74,65 +74,32 @@ train = data[:training_data_len]
 valid = data[training_data_len:]
 valid['Predictions'] = predictions
 
-# plt.figure(figsize=(16,8))
-# plt.title('Model')
-# plt.xlabel('Tarih')
-# plt.ylabel('Kapanış Fiyatı USD')
-# plt.plot(train['Close'])
-# plt.plot(valid[['Close', 'Predictions']])
-# plt.legend(['Eğitim', 'Gerçek', 'Tahminler'], loc='lower right')
-# plt.show()
+# Gelecek 1 yılı tahmin etme
+future_predictions = []
+last_60_days = scaled_data[-60:]
 
-# Generate future dates for prediction (next 30 days)
-future_dates = pd.date_range(start=data.index[-1] + pd.Timedelta(days=1), periods=30, freq='D')
+for i in range(365):  # 1 yıl = 365 gün
+    X_future = last_60_days[-60:]
+    X_future = np.reshape(X_future, (1, X_future.shape[0], 1))
+    future_pred = model.predict(X_future)
+    future_predictions.append(future_pred[0, 0])
+    last_60_days = np.append(last_60_days, future_pred, axis=0)
+    last_60_days = last_60_days[1:]
 
-# Scale the test data including the future dates
-future_test_data = np.append(test_data, scaled_data[-60:, :])
+# Tahminleri orijinal ölçeğe geri dönüştürme
+future_predictions = scaler.inverse_transform(np.array(future_predictions).reshape(-1, 1))
 
-# Reshape future_test_data to maintain its 3-dimensional structure
-future_test_data = np.reshape(future_test_data, (-1, 1))
+# Gelecek yılın tarihlerini oluşturma
+last_date = data.index[-1]
+future_dates = pd.date_range(last_date, periods=30, freq='D')
 
-X_future = []
-
-for i in range(60, len(future_test_data)):
-    X_future.append(future_test_data[i-60:i, 0])
-
-X_future = np.array(X_future)
-X_future = np.reshape(X_future, (X_future.shape[0], X_future.shape[1], 1))
-
-# Make predictions for the future dates
-future_predictions = model.predict(X_future)
-future_predictions = scaler.inverse_transform(future_predictions)
-
-# Slice future predictions to match future_dates length
-future_predictions = future_predictions[:30]
-
-future_predictions_updated = []
-
-
-data_once = yf.download(fund_symbol, start="2024-06-25", end="2024-06-26")
-value = data_once.iloc[0, 0]  # Assuming it's the first row and first column
-
-first = future_predictions[0]
-print(value)
-print(first[0])
-result = abs(value-first[0])
-for item in future_predictions:
-    future_predictions_updated.append(item+result) 
-
-# Flatten future_predictions if needed
-# future_predictions = future_predictions.flatten()
-
-# Visualize predictions including future dates
-plt.figure(figsize=(24,8))
+# Gelecek tahminlerini görselleştirme
+plt.figure(figsize=(16,8))
 plt.title('Model')
 plt.xlabel('Date')
-plt.ylabel('Closing Price (USD)')
+plt.ylabel('Close Price USD ($)')
 # plt.plot(train['Close'])
 plt.plot(valid[['Close', 'Predictions']])
-plt.plot(future_dates, future_predictions_updated, linestyle='dashed', color='b')
-plt.legend(['Training', 'Actual', 'Predictions', 'Future Predictions'], loc='lower right')
+plt.plot(future_dates, future_predictions, color='orange', label='Future Predictions')
+plt.legend(['Train', 'Val', 'Predictions', 'Future Predictions'], loc='lower right')
 plt.show()
-
-
-
